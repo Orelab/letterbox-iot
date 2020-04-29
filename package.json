@@ -1,0 +1,23 @@
+{
+  "name": "letterbox-iot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Orelab/letterbox-iot.git"
+  },
+  "author": "Aurélien Chirot",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/Orelab/letterbox-iot/issues"
+  },
+  "homepage": "https://github.com/Orelab/letterbox-iot#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
