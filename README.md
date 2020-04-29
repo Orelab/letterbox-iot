@@ -9,6 +9,10 @@ made with NodeJS/Express
 The development board I used is a wemos D1 mini clone (as cheap as 0,60€),
 and a simple (0,30€)
 
+- First, rename config.sample.h to config.h and changes values for your needs.
+- Then, install the TimeLib library : https://github.com/PaulStoffregen/Time
+- Don't forget to install the ESP8266 community board
+
 
 ## The server
 
@@ -17,6 +21,10 @@ a date. The object will get it at startup and synchronise with it every day.
 
 An other feature is the ability to record the states of the object : battery
 level, status of the letterbox (empty or full), with datetime.
+
+- npm install
+- change the port to comply to the config.h value
+- npm run start
 
 
 ## Planned
