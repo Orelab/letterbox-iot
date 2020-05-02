@@ -6,9 +6,9 @@
 #define PASS "WIFI_PASSWORD"
 
 
-#define free_user "FREE_USER_ID"
+#define FREE_USER "FREE_USER_ID"
 
-#define free_pass "FREE_USER_PASSWORD"
+#define FREE_PASS "FREE_USER_PASSWORD"
 
 
 #define SERVER_IP "192.168.1.30"

@@ -12,6 +12,9 @@ Panneau solaire + MCP73871
 https://www.bakke.online/index.php/2017/08/06/solar-powered-esp8266/
 https://ouiouioui.squarespace.com/?offset=1521548273576
 
+SPIFFS
+https://byfeel.info/eeprom-ou-spiffs/
+
 */
 
 // HTTP server
@@ -24,187 +27,202 @@ https://ouiouioui.squarespace.com/?offset=1521548273576
 #include <HttpClient.h>
 
 // https://github.com/PaulStoffregen/Time
-// #include <TimeLib.h>
+// https://projetsdiy.fr/esp8266-web-serveur-partie3-heure-internet-ntp-ntpclientlib/
+#include <TimeLib.h>
+#include <NtpClientLib.h>
 
 #include "config.h"
 
+// Infrared port
+const int IR_LED = 4;
 
-WiFiServer WebServer(80);
-WiFiClient client;
+// interval between two checkings, in seconds
+const int interval = 60 * 10;
 
-const int IR_LED = 2;
-
-// The time, in milliseconds since 1/1/70
-int the_time = 0;
-
-// The last moment a detection has been made
-int last_detection = 0;
-
-
-
-void setup() {
+void setup()
+{
   Serial.begin(57600);
 
-  Serial.printf("Wi-Fi mode set to WIFI_STA %s\n", WiFi.mode(WIFI_STA) ? "" : "Failed!");
   Serial.print("Connecting to ");
   Serial.println(SSID);
 
+  WiFi.mode(WIFI_STA);
   WiFi.begin(SSID, PASS);
 
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(500);
-    //Serial.print( wifi_status() );
     Serial.print(".");
   }
 
-  // WiFi.printDiag(Serial);
-
-
-  // Start the Web Server
-  WebServer.begin();
-  Serial.println("Web Server started");
-
-  // Print the IP address
-  Serial.print("You can connect to the ESP8266 at this URL: ");
-  Serial.print("http://");
-  Serial.print(WiFi.localIP());
-  Serial.println("/");
-
-  // Send IP by SMS
-  https_free_smsapi("Letterbox agent IP is http://" + WiFi.localIP().toString());
-
-  // Synchronise clock with server
-  the_time = http_get_clock();
-  Serial.println(the_time);
-  //setTime(the_time);
-  //Serial.println(dayStr());
+  // Sync time
+  // NTP.onNTPSyncEvent([](NTPSyncEvent_t error) {
+  //   if (error) {
+  //     Serial.print("Time Sync error: ");
+  //     if (error == noResponse)
+  //       Serial.println("NTP server not reachable");
+  //     else if (error == invalidAddress)
+  //       Serial.println("Invalid NTP server address");
+  //     else
+  //       Serial.println(String("NTP error n°") + error);
+  //   } else {
+  //     Serial.print("Got NTP time: ");
+  //     Serial.println(NTP.getTimeDateString(NTP.getLastNTPSync()));
+  //   }
+  // });
+  // NTP.setInterval(60*60*12); // sync time every 12H
+  // NTP.begin("fr.pool.ntp.org", 1, true);
 
   // infrared
   pinMode(IR_LED, INPUT_PULLUP);
+
+  // SPIFFS
+  SPIFFS.begin();
 }
 
-
-
-
-void loop() {
+void loop()
+{
   check_status();
 
-  // one test per minute
-  delay(60000);
+  // every 10 seconds
+  // delay(1000*10);
 
-  //http_server();
+  // every 10 seconds
+  // Serial.println("Hello !");
+  // http_debug("Hello !");
+
+  ESP.deepSleep(10 * 1000000);
 }
-
-
-
-void http_server(){
-
-  client = WebServer.available();
-
-  if (!client) {
-    return;
-  }
-
-  while (!client.available()) {
-    delay(1);
-  }
-
-  String request = client.readStringUntil('\r\n');
-  Serial.println(request);
-  client.flush();
-
-  if (request.indexOf("/LED=ON") != -1) {}
-
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-Type: text/html; charset=UTF-8");
-  client.println("");
-  client.println("<!DOCTYPE HTML><html><head>");
-  client.println("<title>Letter box checker</title>");
-  client.println("</head><body><p>Letter box is ");
-  client.println( digitalRead(IR_LED) ? "empty" : "full" );
-  client.println("</p></body></html>");
-}
-
 
 void https_free_smsapi(String message)
 {
   WiFiClientSecure client;
 
-  const char* fingerprint = "3B 5C 64 35 F5 28 BF 1C FA 96 DC E7 65 B1 E1 B3 2E 84 35 77";
+  const char *fingerprint = "3B 5C 64 35 F5 28 BF 1C FA 96 DC E7 65 B1 E1 B3 2E 84 35 77";
 
   client.setFingerprint(fingerprint);
 
-  if (! client.connect("smsapi.free-mobile.fr", 443)) {
+  if (!client.connect("smsapi.free-mobile.fr", 443))
+  {
     Serial.println("connection failed");
     return;
   }
 
-  if (! client.verify(fingerprint, "smsapi.free-mobile.fr")) {
+  if (!client.verify(fingerprint, "smsapi.free-mobile.fr"))
+  {
     Serial.println("certificate doesn't match");
     return;
   }
 
-  client.print(String("GET /sendmsg?user=") + free_user + "&pass=" + free_pass + "&msg=" + message );
+  client.print(String("GET /sendmsg?user=") + FREE_USER + "&pass=" + FREE_PASS + "&msg=" + message);
   client.println(" HTTP/1.1");
   client.println("Host: smsapi.free-mobile.fr");
   client.println();
 }
 
-
-
-
-
-int http_get_clock()
+void http_debug(String message)
 {
-  char* result = "";
-
   WiFiClient client;
-
-  if (!client.connect(SERVER_IP, SERVER_PORT)) {
-    Serial.println("connection failed");
-    delay(5000);
-    return 0;
-  }
-
-  if (client.connected()) {
-    client.println("GET /time HTTP/1.1\n\n");
-  }
-
-  unsigned long timeout = millis();
-  while (client.available() == 0) {
-    if (millis() - timeout > 5000) {
-      Serial.println(">>> Client Timeout !");
-      client.stop();
-      delay(60000);
-      return 0;
-    }
-  }
-
-  while (client.available()) {
-    result += static_cast<char>(client.read());
-  }
-
+  client.connect("192.168.1.30", 3000);
+  client.println(String("GET /") + urlencode(message) + " HTTP/1.1\n\n");
   client.stop();
-
-  return (int)result;
 }
 
-
-int get_time(){
-  return the_time + millis();
-}
-
-
-void check_status(){
-  // No detection during the 10 hours after the last detection,
-  // to prevent intempestive solicitations...
-  if( get_time() - last_detection < 1000*60*60*10 ){
-    return;
+String urlencode(String str)
+{
+  String encodedString = "";
+  char c;
+  char code0;
+  char code1;
+  char code2;
+  for (int i = 0; i < str.length(); i++)
+  {
+    c = str.charAt(i);
+    if (c == ' ')
+    {
+      encodedString += '+';
+    }
+    else if (isalnum(c))
+    {
+      encodedString += c;
+    }
+    else
+    {
+      code1 = (c & 0xf) + '0';
+      if ((c & 0xf) > 9)
+      {
+        code1 = (c & 0xf) - 10 + 'A';
+      }
+      c = (c >> 4) & 0xf;
+      code0 = c + '0';
+      if (c > 9)
+      {
+        code0 = c - 10 + 'A';
+      }
+      code2 = '\0';
+      encodedString += '%';
+      encodedString += code0;
+      encodedString += code1;
+      //encodedString+=code2;
+    }
+    yield();
   }
+  return encodedString;
+}
+
+void check_status()
+{
+  //Serial.print( NTP.getTimeDateString() + " " );
+
+  // Getting the state (true=full)
+  bool state = !digitalRead(IR_LED);
+  bool prev_state = load_state();
 
   // If the infrared is ON during the test, an SMS is sent
-  if( ! digitalRead(IR_LED) ){
+  if ( ! prev_state && state)
+  {
+    Serial.println("You have mail !");
     https_free_smsapi("You have mail !");
-    last_detection = get_time();
+    // http_debug("You have mail");
   }
+  else
+  {
+    Serial.println(String("Mailbox is ") + (state ? "full" : "empty"));
+    // http_debug(String("Mailbox is ") + (state ? "full" : "empty"));
+  }
+
+  save_state(state);
+}
+
+void save_state(bool state)
+{
+  if ( ! SPIFFS.exists("/state.txt")) {
+    SPIFFS.format();
+    Serial.println("state.txt  formatted");
+  }
+
+  File f = SPIFFS.open("/state.txt", "w");
+  f.print(state?"1":"0");
+  f.close();
+}
+
+bool load_state()
+{
+  String value = "";
+
+  if ( ! SPIFFS.exists("/state.txt")) {
+    SPIFFS.format();
+    Serial.println("state.txt  formatted");
+  }
+
+  File file = SPIFFS.open("/state.txt", "r");
+
+  while (file.available())
+  {
+    value += char(file.read());
+  }
+
+  file.close();
+
+  return value=="1";
 }
