@@ -91,7 +91,7 @@ void loop()
   // Serial.println("Hello !");
   // http_debug("Hello !");
 
-  ESP.deepSleep(10 * 1000000);
+  ESP.deepSleep(interval * 1000000);
 }
 
 void https_free_smsapi(String message)
