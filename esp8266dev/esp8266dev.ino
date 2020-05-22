@@ -26,6 +26,10 @@ https://byfeel.info/eeprom-ou-spiffs/
 // HTTP client
 #include <HttpClient.h>
 
+// https://github.com/PaulStoffregen/Time
+// https://projetsdiy.fr/esp8266-web-serveur-partie3-heure-internet-ntp-ntpclientlib/
+#include <TimeLib.h>
+#include <NtpClientLib.h>
 
 #include "config.h"
 
@@ -38,52 +42,10 @@ const int interval = 60 * 10;
 void setup()
 {
   Serial.begin(57600);
-  SPIFFS.begin();
 
-  // prev & current states
-  pinMode(IR_LED, INPUT_PULLUP);
-  bool state = !digitalRead(IR_LED);
-  bool prev_state = load_state();
+  Serial.print("Connecting to ");
+  Serial.println(SSID);
 
-  
-  if(!prev_state && state) // You have new mail !
-  {
-    // Wifi
-    wifi_connect();
-
-    if( https_free_smsapi(String("You have mail ! (batt:")+ESP.getVcc()+")") )
-    {
-      save_state(state);
-      Serial.println("You have mail !");
-      // http_debug("You have mail");
-    }
-    else
-    {
-      Serial.println("You have mail, but SMS notification failed ! Retrying next time...");
-    }
-  }
-  else
-  {
-    Serial.println(String("Mailbox is ") + (state?"full":"empty"));
-    // http_debug(String("Mailbox is ") + (state ? "full" : "empty"));
-
-    save_state(state);
-  }
-
-
-  // Sleep
-  ESP.deepSleep(interval * 1000000);
-  //delay(interval * 1000);  
-}
-
-void loop()
-{
-}
-
-
-
-void wifi_connect()
-{
   WiFi.mode(WIFI_STA);
   WiFi.begin(SSID, PASS);
 
@@ -92,9 +54,39 @@ void wifi_connect()
     delay(500);
     Serial.print(".");
   }
+
+  // Sync time
+  // NTP.onNTPSyncEvent([](NTPSyncEvent_t error) {
+  //   if (error) {
+  //     Serial.print("Time Sync error: ");
+  //     if (error == noResponse)
+  //       Serial.println("NTP server not reachable");
+  //     else if (error == invalidAddress)
+  //       Serial.println("Invalid NTP server address");
+  //     else
+  //       Serial.println(String("NTP error n°") + error);
+  //   } else {
+  //     Serial.print("Got NTP time: ");
+  //     Serial.println(NTP.getTimeDateString(NTP.getLastNTPSync()));
+  //   }
+  // });
+  // NTP.setInterval(60*60*12); // sync time every 12H
+  // NTP.begin("fr.pool.ntp.org", 1, true);
+
+  // infrared
+  pinMode(IR_LED, INPUT_PULLUP);
+
+  // SPIFFS
+  SPIFFS.begin();
 }
 
+void loop()
+{
+  check_status();
 
+  //delay(interval * 1000);
+  ESP.deepSleep(interval * 1000000);
+}
 
 bool https_free_smsapi(String message)
 {
@@ -124,8 +116,6 @@ bool https_free_smsapi(String message)
   return true;
 }
 
-
-
 void http_debug(String message)
 {
   WiFiClient client;
@@ -133,8 +123,6 @@ void http_debug(String message)
   client.println(String("GET /") + urlencode(message) + " HTTP/1.1\n\n");
   client.stop();
 }
-
-
 
 String urlencode(String str)
 {
@@ -178,7 +166,32 @@ String urlencode(String str)
   return encodedString;
 }
 
+void check_status()
+{
+  //Serial.print( NTP.getTimeDateString() + " " );
 
+  // Getting the state (true=full)
+  bool state = !digitalRead(IR_LED);
+  bool prev_state = load_state();
+
+  // If the infrared is ON during the test, an SMS is sent
+  if ( ! prev_state && state)
+  {
+    Serial.println("You have mail !");
+    if( https_free_smsapi(String("You have mail ! (batt:")+ESP.getVcc()+")") )
+    {
+      save_state(state);
+      // http_debug("You have mail");
+    }
+  }
+  else
+  {
+    Serial.println(String("Mailbox is ") + (state ? "full" : "empty"));
+    // http_debug(String("Mailbox is ") + (state ? "full" : "empty"));
+
+    save_state(state);
+  }
+}
 
 void save_state(bool state)
 {
@@ -191,7 +204,6 @@ void save_state(bool state)
   f.print(state?"1":"0");
   f.close();
 }
-
 
 bool load_state()
 {
