@@ -1,3 +1,4 @@
 .vscode
 node_modules
 esp8266/config.h
+esp8266dev/config.h
