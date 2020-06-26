@@ -20,14 +20,14 @@ https://byfeel.info/eeprom-ou-spiffs/
 // HTTP server
 #include <ESP8266WiFi.h>
 
-// For BEAR SSL
+// This one contains HTTP_CODE_OK
 #include <ESP8266HTTPClient.h>
 
-// HTTPS client
-#include <WiFiClientSecure.h>
+// HTTPS client (https_free_smsapi)
+//#include <WiFiClientSecure.h>
 
 // HTTP client
-#include <HttpClient.h>
+//#include <HttpClient.h>
 
 #include "config.h"
 
@@ -40,8 +40,7 @@ const int IR_LED = 4;   // D2
 const int IR_POWER = 5; // D1
 
 // interval between two checkings, in seconds
-//const int interval = 60 * 10;
-const int interval = 10;
+const int interval = 60 * 10 / 60;
 
 void setup()
 {
@@ -55,27 +54,31 @@ void setup()
   // give power to the infrared module.
   pinMode(IR_POWER, OUTPUT);
   digitalWrite(IR_POWER, HIGH);
-  delay(10);
+  delay(100);
 
   // prev & current states
   pinMode(IR_LED, INPUT_PULLUP);
   bool state = !digitalRead(IR_LED);
   bool prev_state = load_state();
 
+  // shutting down infrared
+  digitalWrite(IR_POWER, LOW);
+
   if (!prev_state && state) // You have new mail !
   {
-    // Wifi
     wifi_connect();
+    
+    String message = String("You have mail ! (batt:") + ESP.getVcc() + ")";
 
-    if (bear_https_free_smsapi(String("You have mail ! (batt:") + ESP.getVcc() + ")"))
+    if (bear2_https_free_smsapi(message))
     {
       save_state(state);
-      Serial.println("You have mail !");
-      // http_debug("You have mail");
+      Serial.println("SMS notification success !");
+      // http_debug("SMS notification success !");
     }
     else
     {
-      Serial.println("You have mail, but SMS notification failed ! Retrying next time...");
+      Serial.println("SMS notification failed !");
     }
   }
   else
@@ -104,10 +107,68 @@ void wifi_connect()
   {
     delay(500);
     Serial.print(".");
-    Serial.print(WiFi.status());
+    //Serial.print(WiFi.status());
   }
+  Serial.println(" wifi connected !");
 }
 
+// https://forum.arduino.cc/index.php?topic=643540.0
+bool bear2_https_free_smsapi(String message)
+{
+  Serial.println(message);
+
+  BearSSL::WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(5000);
+
+  int retries = 6;
+  while (!client.connect("smsapi.free-mobile.fr", 443) && (retries-- > 0))
+  {
+    Serial.print(".");
+    delay(1000);
+  }
+
+  if (!client.connected())
+  {
+    Serial.println("Failed to connect, going back to sleep");
+    client.stop();
+    return false;
+  }
+
+  String resource = String("/sendmsg?user=") + FREE_USER + "&pass=" + FREE_PASS + "&msg=" + message;
+
+  Serial.print("Request resource: ");
+  Serial.println(resource);
+
+  client.print(String("GET ") + resource +
+               " HTTP/1.1\r\n" +
+               "Host: smsapi.free-mobile.fr\r\n" +
+               "Connection: close\r\n\r\n");
+
+  int timeout = 5 * 10; // 5 seconds
+  while (!client.available() && (timeout-- > 0))
+  {
+    delay(100);
+  }
+
+  if (!client.available())
+  {
+    Serial.println("No response, going back to sleep");
+    client.stop();
+    return false;
+  }
+  while (client.available())
+  {
+    Serial.write(client.read());
+  }
+  Serial.println("\nclosing connection");
+  delay(1000);
+  client.stop();
+
+  return true;
+}
+
+// https://github.com/esp8266/Arduino/issues/3417
 bool bear_https_free_smsapi(String message)
 {
   BearSSL::WiFiClientSecure client;
@@ -130,7 +191,10 @@ bool bear_https_free_smsapi(String message)
     }
     else
     {
-      Serial.print("failed to GET");
+      Serial.println("failed to GET");
+      Serial.println(httpsCode);
+      Serial.println(url);
+      Serial.println(message);
       return false;
     }
   }
@@ -141,7 +205,7 @@ bool bear_https_free_smsapi(String message)
   }
 }
 
-
+// Deprecated
 bool https_free_smsapi(String message)
 {
   WiFiClientSecure client;
@@ -176,7 +240,7 @@ bool https_free_smsapi(String message)
 void http_debug(String message)
 {
   WiFiClient client;
-  client.connect("192.168.1.30", 3000);
+  client.connect(SERVER_IP, SERVER_PORT);
   client.println(String("GET /") + urlencode(message) + " HTTP/1.1\n\n");
   client.stop();
 }
