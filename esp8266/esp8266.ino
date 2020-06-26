@@ -40,7 +40,7 @@ const int IR_LED = 4;   // D2
 const int IR_POWER = 5; // D1
 
 // interval between two checkings, in seconds
-const int interval = 60 * 10 / 60;
+const int interval = 60 * 5; // 5 minutes
 
 void setup()
 {
