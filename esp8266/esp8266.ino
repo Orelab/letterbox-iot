@@ -102,13 +102,21 @@ void wifi_connect()
 {
   WiFi.mode(WIFI_STA);
   WiFi.begin(SSID, PASS);
+  int retries = 10;
 
-  while (WiFi.status() != WL_CONNECTED)
+  while (WiFi.status() != WL_CONNECTED && retries-- > 0)
   {
     delay(500);
     Serial.print(".");
     //Serial.print(WiFi.status());
   }
+
+  if(retry == 5)
+  {
+    // Error : WIFI connextion aborted
+    ESP.deepSleep(interval * 1000000);
+  }
+  
   Serial.println(" wifi connected !");
 }
 
@@ -145,10 +153,10 @@ bool bear2_https_free_smsapi(String message)
                "Host: smsapi.free-mobile.fr\r\n" +
                "Connection: close\r\n\r\n");
 
-  int timeout = 5 * 10; // 5 seconds
+  int timeout = 30; // 30 seconds
   while (!client.available() && (timeout-- > 0))
   {
-    delay(100);
+    delay(1000);
   }
 
   if (!client.available())
