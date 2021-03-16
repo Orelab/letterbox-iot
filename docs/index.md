@@ -21,9 +21,9 @@ and a simple (0,30€)
 - Then, install the TimeLib library : https://github.com/PaulStoffregen/Time
 - Don't forget to install the ESP8266 community board
 
-![Internet Of Things in a letterbox](https://github.com/Orelab/letterbox-iot/blob/master/letterbox-iot.jpg)
+![Internet Of Things in a letterbox](https://github.com/Orelab/letterbox-iot/blob/master/docs/letterbox-iot.jpg)
 
-![This is done with an ESP8266 chipset](https://github.com/Orelab/letterbox-iot/blob/master/letterbox-iot-esp8266.jpg)
+![This is done with an ESP8266 chipset](https://github.com/Orelab/letterbox-iot/blob/master/docs/letterbox-iot-esp8266.jpg)
 
 ## Roadmap
 
